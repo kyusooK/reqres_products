@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         REGION = 'eu-west-2'
-        EKS_API = 'https://A854A56A9E8DC64E6BBFD91B57621678.gr7.eu-west-2.eks.amazonaws.com'
+        EKS_API = 'https://2EEB7F59B852652671CAF2216159BF28.gr7.eu-west-2.eks.amazonaws.com'
         EKS_CLUSTER_NAME = 'user19-eks'
         EKS_JENKINS_CREDENTIAL_ID = 'f23a6537-9fec-4def-a106-c5039f80965a'
         ECR_PATH = '879772956301.dkr.ecr.eu-west-2.amazonaws.com'
