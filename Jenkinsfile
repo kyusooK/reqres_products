@@ -2,20 +2,22 @@ pipeline {
     agent any
 
     environment {
-        REGION = 'eu-west-2'
-        EKS_API = 'https://2EEB7F59B852652671CAF2216159BF28.gr7.eu-west-2.eks.amazonaws.com'
-        EKS_CLUSTER_NAME = 'user19-eks'
-        EKS_JENKINS_CREDENTIAL_ID = 'kube-cred'
-        ECR_PATH = '879772956301.dkr.ecr.eu-west-2.amazonaws.com'
-        ECR_IMAGE = 'user19-products'
-        AWS_CREDENTIAL_ID = 'afae444d-250b-4788-a6aa-72a361045aa9'
+        REGISTRY = 'user19.azurecr.io'
+        IMAGE_NAME = 'product'
+        AKS_CLUSTER = 'user19-aks'
+        RESOURCE_GROUP = 'user19-rsrcgrp'
+        AKS_NAMESPACE = 'default'
+        AZURE_CREDENTIALS_ID = 'Azure-Cred'
+        TENANT_ID = '29d166ad-94ec-45cb-9f65-561c038e1c7a' // Service Principal 등록 후 생성된 ID
     }
+ 
     stages {
         stage('Clone Repository') {
             steps {
                 checkout scm
             }
         }
+        
         stage('Maven Build') {
             steps {
                 withMaven(maven: 'Maven') {
@@ -23,44 +25,55 @@ pipeline {
                 }
             }
         }
+        
         stage('Docker Build') {
             steps {
                 script {
-                    image = docker.build("${ECR_PATH}/${ECR_IMAGE}")                  
-                } 
-            }  
+                    image = docker.build("${REGISTRY}/${IMAGE_NAME}:v${env.BUILD_NUMBER}")
+                }
+            }
         }
-        stage('Push to ECR') {
+        
+        stage('Azure Login') {
             steps {
                 script {
-                    docker.withRegistry("https://${ECR_PATH}", "ecr:${REGION}:${AWS_CREDENTIAL_ID}") {
-                        image.push("v${env.BUILD_NUMBER}")
+                    withCredentials([usernamePassword(credentialsId: env.AZURE_CREDENTIALS_ID, usernameVariable: 'AZURE_CLIENT_ID', passwordVariable: 'AZURE_CLIENT_SECRET')]) {
+                        sh 'az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant ${TENANT_ID}'
                     }
                 }
             }
         }
+        
+        stage('Push to ACR') {
+            steps {
+                script {
+                    sh "az acr login --name ${REGISTRY.split('\\.')[0]}"
+                    sh "docker push ${REGISTRY}/${IMAGE_NAME}:v${env.BUILD_NUMBER}"
+                }
+            }
+        }
+        
         stage('CleanUp Images') {
             steps {
                 sh """
-                docker rmi ${ECR_PATH}/${ECR_IMAGE}:v$BUILD_NUMBER
-                docker rmi ${ECR_PATH}/${ECR_IMAGE}:latest
+                docker rmi ${REGISTRY}/${IMAGE_NAME}:v$BUILD_NUMBER
                 """
             }
         }
-        stage('Deploy to k8s') {
+        
+        stage('Deploy to AKS') {
             steps {
                 script {
-                        withKubeConfig([credentialsId: "${EKS_JENKINS_CREDENTIAL_ID}",
-                                        serverUrl: "${EKS_API}",
-                                        clusterName: "${EKS_CLUSTER_NAME}"]) {
-                            sh "sed 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml > output.yaml"
-                            sh "cat output.yaml"
-                            sh "kubectl apply -f output.yaml"
-                            sh "kubectl apply -f kubernetes/service.yaml"
-                            sh "rm output.yaml"
-                        }
+                    sh "az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_CLUSTER}"
+                    sh """
+                    sed 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml > output.yaml
+                    cat output.yaml
+                    kubectl apply -f output.yaml
+                    kubectl apply -f kubernetes/service.yaml
+                    rm output.yaml
+                    """
                 }
             }
-        } 
+        }
     }
 }
