@@ -10,7 +10,7 @@ pipeline {
         AZURE_CREDENTIALS_ID = 'Azure-Cred'
         TENANT_ID = 'f46af6a3-e73f-4ab2-a1f7-f33919eda5ac' // Service Principal 등록 후 생성된 ID
         GIT_USER_NAME = 'kyusooK'
-        GITHUB_TOKEN = credentials('GITHUB_TOKEN_ID') 
+        GIT_USER_EMAIL = 'rbtn110@uengine.org'
     }
  
     stages {
@@ -68,8 +68,8 @@ pipeline {
                 script {
                     sh """
                     sed -i 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml
+                    git config --global user.email "${GIT_USER_EMAIL}"
                     git config --global user.name "${GIT_USER_NAME}"
-                    git remote set-url origin https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/repository.git
                     git add kubernetes/deploy.yaml
                     git commit -m "Update deployment image tag to v${env.BUILD_ID}"
                     git push origin HEAD:main
