@@ -4,16 +4,13 @@ pipeline {
     environment {
         REGISTRY = 'user07.azurecr.io'
         IMAGE_NAME = 'product'
-        AKS_CLUSTER = 'user07-aks'
-        RESOURCE_GROUP = 'user07-rsrcgrp'
-        AKS_NAMESPACE = 'default'
         AZURE_CREDENTIALS_ID = 'Azure-Cred'
         TENANT_ID = 'f46af6a3-e73f-4ab2-a1f7-f33919eda5ac' // Service Principal 등록 후 생성된 ID
-        GIT_USER_NAME = 'Jenkins'
-        GIT_USER_EMAIL = 'jenkins@example.com'
         GITHUB_CREDENTIALS_ID = 'Github-Cred'
+        GITHUB_REPO = 'https://github.com/your-repo/your-repo-name.git' // 적절히 수정
+        GITHUB_BRANCH = 'main' // 업로드할 브랜치
     }
- 
+
     stages {
         stage('Clone Repository') {
             steps {
@@ -37,16 +34,6 @@ pipeline {
             }
         }
         
-        stage('Azure Login') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: env.AZURE_CREDENTIALS_ID, usernameVariable: 'AZURE_CLIENT_ID', passwordVariable: 'AZURE_CLIENT_SECRET')]) {
-                        sh 'az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant ${TENANT_ID}'
-                    }
-                }
-            }
-        }
-        
         stage('Push to ACR') {
             steps {
                 script {
@@ -63,39 +50,34 @@ pipeline {
                 """
             }
         }
-
-        stage('Update and Push to GitHub') {
+        
+        stage('Update deploy.yaml') {
             steps {
-                withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                script {
                     sh """
-                        sed -i 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml
-                        git config --global user.name "kyusooK"
-                        git config --global user.email "rbtn110@uengine.org"
-                        
-                        # credential.helper를 통해 안전하게 인증 정보 설정
-                        git config --global credential.helper '!f() { echo username=\\$GIT_USERNAME; echo password=\\$GIT_PASSWORD; }; f'
-                        
-                        git add kubernetes/deploy.yaml
-                        git commit -m "Update deployment image tag to v${env.BUILD_ID}"
-                        git push origin HEAD:main
-                        
-                        # 인증 정보 제거
-                        git config --global --unset credential.helper
+                    sed 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml > updated_deploy.yaml
+                    mv updated_deploy.yaml kubernetes/deploy.yaml
+                    cat kubernetes/deploy.yaml
                     """
                 }
             }
         }
-        stage('Deploy to AKS') {
+        
+        stage('Commit and Push to GitHub') {
             steps {
                 script {
-                    sh "az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_CLUSTER}"
-                    sh """
-                    sed 's/latest/v${env.BUILD_ID}/g' kubernetes/deploy.yaml > output.yaml
-                    cat output.yaml
-                    kubectl apply -f output.yaml
-                    kubectl apply -f kubernetes/service.yaml
-                    rm output.yaml
-                    """
+                    withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                        git config --global user.email "your-email@example.com"
+                        git config --global user.name "Jenkins CI"
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@${GITHUB_REPO} repo
+                        cp kubernetes/deploy.yaml repo/kubernetes/deploy.yaml
+                        cd repo
+                        git add kubernetes/deploy.yaml
+                        git commit -m "Update deploy.yaml with build ${env.BUILD_NUMBER}"
+                        git push origin ${GITHUB_BRANCH}
+                        """
+                    }
                 }
             }
         }
