@@ -12,7 +12,7 @@ pipeline {
         GIT_USER_NAME = 'kyusooK'
         GIT_USER_EMAIL = 'rbtn110@uengine.org'
         GITHUB_CREDENTIALS_ID = 'Github-Cred'
-        GITHUB_REPO = 'https://github.com/kyusooK/reqres_products.git' // 적절히 수정
+        GITHUB_REPO = 'github.com/kyusooK/reqres_products.git' // 적절히 수정
         GITHUB_BRANCH = 'master' // 업로드할 브랜치
     }
 
