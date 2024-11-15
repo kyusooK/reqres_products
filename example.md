@@ -1,7 +1,7 @@
 pipeline {
     agent any
 
-    environment {
+    environment { 
         REGISTRY = 'user07.azurecr.io'
         IMAGE_NAME = 'product'
         AZURE_CREDENTIALS_ID = 'Azure-Cred'
