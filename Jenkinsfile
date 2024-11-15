@@ -15,7 +15,7 @@ pipeline {
         GITHUB_REPO = 'github.com/kyusooK/reqres_products.git' // 적절히 수정
         GITHUB_BRANCH = 'master' // 업로드할 브랜치
     }
- 
+  
     stages {
         stage('Clone Repository') {
             steps {
